@@ -96,9 +96,21 @@ exports.createProject = async (req, res) => {
 // ==============================
 // GET ALL PROJECTS
 // ==============================
+// ==============================
+// GET ALL PROJECTS (WITH STATUS FILTER)
+// ==============================
 exports.getProjects = async (req, res) => {
   try {
-    const projects = await Lily.find().sort({ id: -1 });
+    const { status } = req.query;
+
+    let filter = {};
+
+    // If status is provided → filter by status
+    if (status) {
+      filter.status = status;
+    }
+
+    const projects = await Lily.find(filter).sort({ id: -1 });
 
     res.json({
       success: true,
