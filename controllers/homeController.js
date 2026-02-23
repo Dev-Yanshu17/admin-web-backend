@@ -101,13 +101,13 @@ exports.createProject = async (req, res) => {
 // ==============================
 exports.getProjects = async (req, res) => {
   try {
-    const { status } = req.query;
+    const { type } = req.query;
 
     let filter = {};
 
-    // If status is provided → filter by status
-    if (status) {
-      filter.status = status;
+    // Filter by project type
+    if (type) {
+      filter.projectType = type;
     }
 
     const projects = await Lily.find(filter).sort({ id: -1 });
@@ -116,6 +116,7 @@ exports.getProjects = async (req, res) => {
       success: true,
       data: projects
     });
+
   } catch (err) {
     console.error("GET PROJECTS ERROR:", err);
     res.status(500).json({
