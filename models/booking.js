@@ -1,6 +1,17 @@
 const mongoose = require("mongoose");
 const Counter = require("./counter");
 
+const EmiSchema = new mongoose.Schema({
+  monthNo: Number,
+  amount: Number,
+  status: {
+    type: String,
+    enum: ["pending", "paid"],
+    default: "pending",
+  },
+  paidDate: Date,
+});
+
 const BookingSchema = new mongoose.Schema(
   {
     bookingId: { type: Number, unique: true },
@@ -11,41 +22,32 @@ const BookingSchema = new mongoose.Schema(
     customerName: { type: String, required: true },
     mobileNo: { type: String, required: true },
 
-    /* ===== House Area & Pricing ===== */
-    totalSqFeet: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
+    totalSqFeet: { type: Number, required: true },
+    pricePerSqFeet: { type: Number, required: true },
 
-    pricePerSqFeet: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
+  
+    advancePayment: { type: Number, default: 0 },
+  
 
-    totalAmount: {
-      type: Number,
-      required: true,
-    },
+    totalAmount: { type: Number },
+pendingAmount: { type: Number },
 
-    /* ===== Payment ===== */
     paymentType: {
       type: String,
-      enum: ["cash", "bank"],
+      enum: ["cash", "bank", "emi"],
       required: true,
     },
 
-    advancePayment: { type: Number, required: true },
-
-    pendingAmount: { type: Number, required: true },
+    emiMonths: { type: Number, default: 0 },
+    monthlyEmi: { type: Number, default: 0 },
+    emiSchedule: [EmiSchema],
 
     bookingDate: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
 
-/* ===== Auto Increment Booking ID ===== */
+/* Auto Increment */
 BookingSchema.pre("save", async function (next) {
   if (!this.bookingId) {
     const counter = await Counter.findOneAndUpdate(
@@ -56,16 +58,13 @@ BookingSchema.pre("save", async function (next) {
     this.bookingId = counter.count;
   }
 
-  /* ===== Auto Calculate Total Amount ===== */
   this.totalAmount = this.totalSqFeet * this.pricePerSqFeet;
-
-  /* ===== Auto Calculate Pending Amount ===== */
   this.pendingAmount = this.totalAmount - this.advancePayment;
 
   next();
 });
 
-/* Unique booking per house per project */
+/* Unique per house */
 BookingSchema.index({ projectId: 1, houseNumber: 1 }, { unique: true });
 
 module.exports = mongoose.model("Booking", BookingSchema);

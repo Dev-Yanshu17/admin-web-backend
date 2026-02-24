@@ -10,48 +10,34 @@ exports.createBooking = async (req, res) => {
       customerName,
       mobileNo,
       paymentType,
-
       totalSqFeet,
       pricePerSqFeet,
-
       advancePayment = 0,
       emiMonths,
       monthlyEmi,
+      bookingDate,
     } = req.body;
 
-    /* ===== Validation ===== */
     if (!projectId || !houseNumber) {
       return res.status(400).json({
         success: false,
-        message: "Project and house number are required",
+        message: "Project and house number required",
       });
     }
 
-    if (!totalSqFeet || !pricePerSqFeet) {
-      return res.status(400).json({
-        success: false,
-        message: "Total sq.ft and price per sq.ft are required",
-      });
-    }
-
-    /* ===== STEP 1: TOTAL AMOUNT ===== */
-    const totalAmount =
-      Number(totalSqFeet) * Number(pricePerSqFeet);
-
-    /* ===== STEP 2: ADVANCE AMOUNT ===== */
+    const totalAmount = Number(totalSqFeet) * Number(pricePerSqFeet);
     const advance = Number(advancePayment) || 0;
 
     if (advance > totalAmount) {
       return res.status(400).json({
         success: false,
-        message: "Advance amount cannot be greater than total amount",
+        message: "Advance cannot exceed total",
       });
     }
 
-    /* ===== STEP 3: PENDING AMOUNT ===== */
     const pendingAmount = totalAmount - advance;
 
-    /* ===== Check House Status ===== */
+    /* Check house availability */
     let house = await HouseListing.findOne({ projectId, houseNumber });
 
     if (house && house.status !== "available") {
@@ -68,21 +54,22 @@ exports.createBooking = async (req, res) => {
     house.status = "booked";
     await house.save();
 
-    /* ===== EMI Schedule (optional) ===== */
+    /* EMI */
     let emiSchedule = [];
 
     if (paymentType === "emi") {
       if (!emiMonths || !monthlyEmi) {
         return res.status(400).json({
           success: false,
-          message: "EMI months and amount are required",
+          message: "EMI details required",
         });
       }
 
       let remaining = pendingAmount;
 
       for (let i = 1; i <= emiMonths; i++) {
-        const amount = i === emiMonths ? remaining : monthlyEmi;
+        const amount =
+          i === emiMonths ? remaining : Number(monthlyEmi);
 
         emiSchedule.push({
           monthNo: i,
@@ -94,24 +81,19 @@ exports.createBooking = async (req, res) => {
       }
     }
 
-    /* ===== Save Booking ===== */
     const booking = await Booking.create({
       projectId,
       houseNumber,
       customerName,
       mobileNo,
-
       totalSqFeet,
       pricePerSqFeet,
-
-      totalAmount,        // ✅ FIRST
-      advancePayment: advance, // ✅ SECOND
-      pendingAmount,      // ✅ THIRD
-
+      advancePayment: advance,
       paymentType,
       emiMonths: paymentType === "emi" ? emiMonths : 0,
       monthlyEmi: paymentType === "emi" ? monthlyEmi : 0,
       emiSchedule,
+      bookingDate,
     });
 
     res.status(201).json({
@@ -119,12 +101,13 @@ exports.createBooking = async (req, res) => {
       message: "Booking created successfully",
       data: booking,
     });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
-  }
+  }catch (err) {
+  console.error("BOOKING ERROR FULL:", err);   // 👈 IMPORTANT
+  res.status(500).json({
+    success: false,
+    message: err.message,
+  });
+}
 };
 
 

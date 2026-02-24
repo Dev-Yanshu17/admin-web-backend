@@ -1,7 +1,9 @@
 const Booking = require("../models/booking");
 const BookingHistory = require("../models/bookingHistory");
-const Lily = require("../models/home"); // your Lily schema file (home.js)
+const Lily = require("../models/home");
+const mongoose = require("mongoose");
 
+/* ================= ADD PAYMENT ================= */
 exports.addPayment = async (req, res) => {
   try {
     const {
@@ -16,132 +18,122 @@ exports.addPayment = async (req, res) => {
       return res.status(400).json({ message: "Required fields missing" });
     }
 
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+      return res.status(400).json({ message: "Invalid Booking ID" });
+    }
+
     const booking = await Booking.findById(bookingId);
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // 🔑 Fetch project using numeric id
     const project = await Lily.findOne({ id: booking.projectId });
     if (!project) {
       return res.status(400).json({ message: "Project not found" });
     }
 
-    const projectName = project.projectName;
+    let history = await BookingHistory.findOne({ bookingId });
 
-    const historyCount = await BookingHistory.countDocuments({
-      bookingId: booking._id,
-    });
+    /* ================= FIRST TIME CREATE ================= */
+    if (!history) {
+      history = new BookingHistory({
+        bookingId,
+        projectName: project.projectName,
+        customerName: booking.customerName,
+        houseNumber: booking.houseNumber,
+        totalAmount: booking.totalAmount,
+        advancePayment: booking.advancePayment,
+        pendingAmount: booking.totalAmount - booking.advancePayment,
+        payments: [],
+      });
+        
+      // Add advance payment as first entry
+      if (booking.advancePayment > 0) {
+        history.payments.push({
+          amountReceived: booking.advancePayment,
+          paymentMethod: "advance",
+          paymentDetails: {},
+          paymentReceivedDate: booking.createdAt,
+        });
+      }
 
-    if (historyCount === 0 && booking.advancePayment > 0) {
-  const advancePending =
-    booking.totalAmount - booking.advancePayment;
+      await history.save();
+      console.log("HISTORY CREATED:", history);
+    }
 
-  const advanceHistory = new BookingHistory({
-    bookingId: booking._id,
-    projectName,
-    customerName: booking.customerName,
-    houseNumber: booking.houseNumber,
-    totalAmount: booking.totalAmount,
-    advancePayment: booking.advancePayment,
-    pendingAmount: advancePending < 0 ? 0 : advancePending,
-    amountReceived: booking.advancePayment,
-    paymentMethod: "advance",
-    paymentDetails: "Advance payment at booking time",
-    paymentReceivedDate: booking.createdAt,
-  });
-
-  await advanceHistory.save();
-}
-
-
-    if (amountReceived > booking.pendingAmount) {
+    /* ================= CHECK PENDING ================= */
+    if (amountReceived > history.pendingAmount) {
       return res.status(400).json({
         message: "Amount exceeds pending payment",
       });
     }
 
-    const newPending = booking.pendingAmount - amountReceived;
+    /* ================= ADD PAYMENT TO ARRAY ================= */
+    history.payments.push({
+      amountReceived,
+      paymentMethod,
+      paymentDetails,
+      paymentReceivedDate,
+    });
 
-booking.pendingAmount = newPending < 0 ? 0 : newPending;
+    /* ================= UPDATE PENDING ================= */
+    history.pendingAmount =
+      history.pendingAmount - amountReceived < 0
+        ? 0
+        : history.pendingAmount - amountReceived;
 
-const history = new BookingHistory({
-  bookingId: booking._id,
-  projectName,
-  customerName: booking.customerName,
-  houseNumber: booking.houseNumber,
-  totalAmount: booking.totalAmount,
-  advancePayment: booking.advancePayment,
-  pendingAmount: booking.pendingAmount,
-  amountReceived,
-  paymentMethod,
-  paymentDetails,
-  paymentReceivedDate,
-});
+    /* ================= ALSO UPDATE BOOKING ================= */
+    booking.pendingAmount = history.pendingAmount;
 
-await booking.save();
-await history.save();
-
+    await booking.save();
+    await history.save();
 
     res.status(201).json({
-      message: "Payment recorded successfully",
+      message: "Payment added successfully",
       data: history,
     });
+    console.log("PAYMENT ADDED:",BookingHistory);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    console.error("ADD PAYMENT ERROR:", error);
+    res.status(500).json({ message: error.message });
   }
 };
 
-
-
-/* ================= GET DATE-WISE HISTORY ================= */
+/* ================= GET PAYMENT HISTORY ================= */
 exports.getPaymentHistory = async (req, res) => {
   try {
-    const { bookingId, fromDate, toDate, paymentMethod } = req.query;
+    const { bookingId } = req.query;
 
-    const filter = {};
-
-    if (bookingId) {
-      filter.bookingId = bookingId;
+    if (!bookingId) {
+      return res.status(400).json({ message: "Booking ID required" });
     }
 
-    if (fromDate && toDate) {
-      filter.paymentReceivedDate = {
-        $gte: new Date(fromDate),
-        $lte: new Date(toDate),
-      };
-    }
+    const history = await BookingHistory.findOne({ bookingId });
 
-    if (paymentMethod) {
-      filter.paymentMethod = paymentMethod;
-    }
-
-    // const history = await BookingHistory.find(filter)
-    //   .sort({ paymentReceivedDate: 1 });
-
-     const history = await BookingHistory.find(filter)
-      .sort({ createdAt: -1 });
-
-
-    res.json({ data: history });
+    res.json({ data: history || null });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-
+/* ================= GET BOOKING BY ID ================= */
 exports.getBookingById = async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id);
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid Booking ID" });
+    }
+
+    const booking = await Booking.findById(id);
 
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
+    console.log("BOOKING FOUND:", booking);
 
     res.json({ data: booking });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
-
-
