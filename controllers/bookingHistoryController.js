@@ -95,6 +95,23 @@ exports.getPaymentHistory = async (req, res) => {
 
     const history = await BookingHistory.findOne({ bookingId });
 
+    if (!history) {
+      return res.json({ data: null });
+    }
+
+    // ✅ Custom sort
+    history.payments.sort((a, b) => {
+      // 🔥 Advance always first
+      if (a.paymentMethod === "advance") return -1;
+      if (b.paymentMethod === "advance") return 1;
+
+      // Then sort by date ASC
+      return (
+        new Date(a.paymentReceivedDate) -
+        new Date(b.paymentReceivedDate)
+      );
+    });
+
     res.json({ data: history });
   } catch (error) {
     res.status(500).json({ error: error.message });
