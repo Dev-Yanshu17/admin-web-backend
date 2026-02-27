@@ -21,10 +21,10 @@ exports.addPayment = async (req, res) => {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // 🔥 Find existing history
+    // Find existing history
     let history = await BookingHistory.findOne({ bookingId });
 
-    // 🔥 If first time create document
+    //  If first time create document
     if (!history) {
       history = new BookingHistory({
         bookingId: booking._id,
@@ -36,7 +36,7 @@ exports.addPayment = async (req, res) => {
         payments: [],
       });
 
-      // 🔥 Add advance payment automatically
+      // Add advance payment automatically
       if (booking.advancePayment > 0) {
         history.payments.push({
           amountReceived: booking.advancePayment,
@@ -47,14 +47,14 @@ exports.addPayment = async (req, res) => {
       }
     }
 
-    // 🔥 Check pending
+    //  Check pending
     if (amountReceived > history.pendingAmount) {
       return res.status(400).json({
         message: "Amount exceeds pending payment",
       });
     }
 
-    // 🔥 Push new payment into array
+    //  Push new payment into array
     history.payments.push({
       amountReceived,
       paymentMethod,
@@ -62,13 +62,13 @@ exports.addPayment = async (req, res) => {
       paymentReceivedDate,
     });
 
-    // 🔥 Minus from pending
+    //  Minus from pending
     history.pendingAmount =
       history.pendingAmount - amountReceived < 0
         ? 0
         : history.pendingAmount - amountReceived;
 
-    // 🔥 Also update booking pending
+    //  Also update booking pending
     booking.pendingAmount = history.pendingAmount;
 
     await booking.save();
@@ -101,7 +101,7 @@ exports.getPaymentHistory = async (req, res) => {
 
     // ✅ Custom sort
     history.payments.sort((a, b) => {
-      // 🔥 Advance always first
+      // Advance always first
       if (a.paymentMethod === "advance") return -1;
       if (b.paymentMethod === "advance") return 1;
 

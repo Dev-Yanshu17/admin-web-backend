@@ -2,7 +2,7 @@ const Service = require("../models/Service");
 const Counter = require("../models/counter");
 
 
-// ➕ CREATE SERVICE
+//  CREATE SERVICE
 exports.createService = async (req, res) => {
   try {
     const counter = await Counter.findOneAndUpdate(
@@ -40,14 +40,14 @@ exports.createService = async (req, res) => {
 
 
 
-// 📥 GET ALL SERVICES
+//  GET ALL SERVICES
 exports.getAllServices = async (req, res) => {
   const services = await Service.find().sort({ id: 1 });
   res.json({ success: true, data: services });
 };
 
 
-// 📄 GET SINGLE SERVICE BY ID
+//  GET SINGLE SERVICE BY ID
 exports.getServiceById = async (req, res) => {
   try {
     const service = await Service.findOne({
@@ -73,7 +73,7 @@ exports.getServiceById = async (req, res) => {
   }
 };
 
-// ✏ UPDATE SERVICE
+//  UPDATE SERVICE
 exports.updateService = async (req, res) => {
   try {
     const updateData = {
@@ -117,7 +117,7 @@ exports.updateService = async (req, res) => {
 
 
 
-// 🗑 DELETE SERVICE
+//  DELETE SERVICE
 exports.deleteService = async (req, res) => {
   await Service.findOneAndDelete({ id: req.params.id });
   res.json({ success: true });

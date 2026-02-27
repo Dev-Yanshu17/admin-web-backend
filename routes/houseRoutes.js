@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-// ✅ IMPORT controller functions
+// IMPORT controller functions
 const {
   getAllProjects,
   getHouseListing,
